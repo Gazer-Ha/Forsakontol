@@ -1,7 +1,7 @@
 -- Compiled with roblox-ts v3.0.0
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local PlayerGui = cloneref(game:GetService("CoreGui")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 local function getDirection(currentRow, currentCol, otherRow, otherCol)
 	if otherRow < currentRow then
@@ -321,7 +321,7 @@ local function createSolveButton()
     screenGui.Parent = PlayerGui
 
     
-    return button
+    return screenGui, button
 end
 
 
@@ -346,7 +346,7 @@ if bb then
 		local puzzle = output[1]
 		
 		-- Create solve button
-		local solveButton = createSolveButton()
+		local gui, solveButton = createSolveButton()
 		
 		
 		if solveButton then
@@ -355,6 +355,7 @@ if bb then
 				HintSystem:DrawSolutionInstantly(puzzle)
 				solveButton.Text = "SOLVED!"
 				solveButton:Destroy()
+				gui:Destroy()
 				solveButton.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
 				local elapsed = tick() - lastButtonCreationTime
     

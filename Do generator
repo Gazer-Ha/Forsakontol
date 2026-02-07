@@ -1,7 +1,7 @@
 -- Compiled with roblox-ts v3.0.0
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-
+local PlayerGui = cloneref(game:GetService("CoreGui")
 
 local function getDirection(currentRow, currentCol, otherRow, otherCol)
 	if otherRow < currentRow then
@@ -318,7 +318,7 @@ local function createSolveButton()
     end)
 
     button.Parent = screenGui
-    screenGui.Parent = cloneref(game:GetService("CoreGui"))
+    screenGui.Parent = PlayerGui
 
     
     return button

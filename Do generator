@@ -1,110 +1,229 @@
--- cave divers whe- 🕳️
+-- Compiled with roblox-ts v3.0.0
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
-local runService = game:GetService("RunService")
-
-local isPaused = false
-local isStopped = false
-
-local player = game.Players.LocalPlayer
-local playerName = player.Name
-local survivorsFolder = workspace:WaitForChild("Players"):WaitForChild("Survivors")
-
-local screenGui = Instance.new("ScreenGui")
-screenGui.Parent = cloneref(game:GetService("CoreGui"))
-
-local function accwait(duration)
-    if not duration or duration <= 0 then return end
-    local start = os.clock()
-    local conn
-    conn = runService.PreRender:Connect(function()
-        if isStopped then conn:Disconnect() end
-    end)
-    while os.clock() - start < duration do
-        if isStopped then
-            conn:Disconnect()
-            return
-        end
-        while isPaused and not isStopped do
-            runService.PreRender:Wait()
-        end
-        runService.PreRender:Wait()
-    end
-    conn:Disconnect()
+-- // HELPER FUNCTIONS // --
+local function getDirection(currentRow, currentCol, otherRow, otherCol)
+	if otherRow < currentRow then return "up" end
+	if otherRow > currentRow then return "down" end
+	if otherCol < currentCol then return "left" end
+	if otherCol > currentCol then return "right" end
 end
 
-local button = Instance.new("TextButton")
-button.Parent = screenGui
-button.Size = UDim2.new(0, 100, 0, 50)
-button.Position = UDim2.new(0.8, -110, 0.4, -25)
-button.Text = "Do Generator"
-button.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-button.TextColor3 = Color3.new(1, 1, 1)
-button.Draggable = true
-button.Active = true
-
-local player = game.Players.LocalPlayer
-local char = player.Character
-local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-local cooldown = false 
-
-local function getNearestGenerator()
-    local playerModel = nil
-    for _, model in pairs(survivorsFolder:GetChildren()) do
-        if model:IsA("Model") and model:GetAttribute("Username") == playerName then
-            playerModel = model
-            break
-        end
-    end
-
-    if not playerModel then
-        warn("Player model not found in Survivors folder!")
-        return
-    end
-
-    local rootPart = playerModel:WaitForChild("HumanoidRootPart") -- Use root part from player's model
-    local closestGen = nil
-    local shortestDist = math.huge
-
-    local map = workspace:WaitForChild("Map"):WaitForChild("Ingame"):WaitForChild("Map")
-
-    for _, obj in pairs(map:GetChildren()) do
-        if obj:IsA("Model") and obj.Name == "Generator" then
-            local primaryPart = obj.PrimaryPart or obj:FindFirstChild("PrimaryPart") -- Ensure it has a PrimaryPart
-            if primaryPart then
-                local dist = (primaryPart.Position - rootPart.Position).Magnitude
-                if dist < shortestDist then
-                    shortestDist = dist
-                    closestGen = obj
-                end
-            end
-        end
-    end
-
-    return closestGen
+local function getConnections(prev, curr, nextnode)
+	local connections = {}
+	if prev and curr then
+		local dir = getDirection(curr.row, curr.col, prev.row, prev.col)
+		if dir == "up" then dir = "down"
+		elseif dir == "down" then dir = "up"
+		elseif dir == "left" then dir = "right"
+		elseif dir == "right" then dir = "left" end
+		if dir ~= "" and dir then connections[dir] = true end
+	end
+	if nextnode and curr then
+		local dir = getDirection(curr.row, curr.col, nextnode.row, nextnode.col)
+		if dir ~= "" and dir then connections[dir] = true end
+	end
+	return connections
 end
 
-button.MouseButton1Click:Connect(function()
-    if cooldown then return end -- Prevent multiple clicks
+local function isNeighbourLocal(r1, c1, r2, c2)
+	if r2 == r1 - 1 and c2 == c1 then return "up" end
+	if r2 == r1 + 1 and c2 == c1 then return "down" end
+	if r2 == r1 and c2 == c1 - 1 then return "left" end
+	if r2 == r1 and c2 == c1 + 1 then return "right" end
+	return false
+end
 
-    cooldown = true 
-    button.Text = "Cooldown"
+local function coordKey(node)
+	return `{node.row}-{node.col}`
+end
 
-    local nearestGen = getNearestGenerator()
-    if nearestGen then
-        local remotes = nearestGen:WaitForChild("Remotes")
-        remotes:WaitForChild("RF"):InvokeServer("enter")
-        remotes:WaitForChild("RE"):FireServer()
-accwait(0.1)
-remotes:WaitForChild("RF"):InvokeServer("leave")
-        
-        
+local function orderPathFromEndpoints(path, endpoints)
+	if not path or #path == 0 then return path end
+	local startEndpoint
+	for _, ep in endpoints or {} do
+		for _1, n in path do
+			if n.row == ep.row and n.col == ep.col then
+				startEndpoint = { row = ep.row, col = ep.col }
+				break
+			end
+		end
+		if startEndpoint then break end
+	end
+	if not startEndpoint then
+		local inPath = {}
+		for _, n in path do inPath[coordKey(n)] = n end
+		for _, n in path do
+			local neighbours = 0
+			local dirs = { { n.row - 1, n.col }, { n.row + 1, n.col }, { n.row, n.col - 1 }, { n.row, n.col + 1 } }
+			for _1, _binding in dirs do
+				if inPath[`{_binding[1]}-{_binding[2]}`] ~= nil then neighbours += 1 end
+			end
+			if neighbours == 1 then
+				startEndpoint = { row = n.row, col = n.col }
+				break
+			end
+		end
+	end
+	if not startEndpoint then
+		startEndpoint = { row = path[1].row, col = path[1].col }
+	end
+	local remaining = {}
+	for _, n in path do remaining[coordKey(n)] = { row = n.row, col = n.col } end
+	local ordered = {}
+	local current = { row = startEndpoint.row, col = startEndpoint.col }
+	table.insert(ordered, table.clone(current))
+	remaining[coordKey(current)] = nil
+	while true do
+		local _size = 0
+		for _ in remaining do _size += 1 end
+		if not (_size > 0) then break end
+		local foundNext = false
+		for key, node in remaining do
+			local _value = isNeighbourLocal(current.row, current.col, node.row, node.col)
+			if _value ~= "" and _value then
+				table.insert(ordered, table.clone(node))
+				remaining[key] = nil
+				current = node
+				foundNext = true
+				break
+			end
+		end
+		if not foundNext then return path end
+	end
+	return ordered
+end
 
-        
-    else
-        warn("No nearby generator found!")
-    end
-    accwait(0.9)
-    button.Text = "Do Generator"
-    cooldown = false 
-end)
+local HintSystem = {}
+do
+	local _container = HintSystem
+	
+	-- Optimized Instant Solver
+	local function DrawSolutionInstantly(self, puzzle)
+		if not puzzle or not puzzle.Solution then return nil end
+		
+		-- 1. Setup paths
+		for colorIndex = 0, #puzzle.Solution - 1 do
+			puzzle.paths[colorIndex + 1] = {}
+		end
+		
+		-- 2. Calculate data
+		for colorIndex = 0, #puzzle.Solution - 1 do
+			local path = puzzle.Solution[colorIndex + 1]
+			local endpoints = puzzle.targetPairs[colorIndex + 1]
+			local orderedPath = orderPathFromEndpoints(path, endpoints)
+			puzzle.paths[colorIndex + 1] = {}
+			
+			-- Fill nodes and calculate pipe connections for visuals
+			for i = 1, #orderedPath do
+				local node = orderedPath[i]
+				table.insert(puzzle.paths[colorIndex + 1], { row = node.row, col = node.col })
+				
+				-- Handle visuals (connections)
+				local prev = orderedPath[i - 1]
+				local nextNode = orderedPath[i + 1]
+				
+				-- Note: orderedPath is 1-based in this scope
+				-- Logic adjusted to ensure pipes connect visually
+				if i > 1 then prev = orderedPath[i-1] else prev = nil end
+				if i < #orderedPath then nextNode = orderedPath[i+1] else nextNode = nil end
+
+				local conn = getConnections(prev, node, nextNode)
+				puzzle.gridConnections = puzzle.gridConnections or {}
+				puzzle.gridConnections[`{node.row}-{node.col}`] = conn
+			end
+		end
+		
+		-- 3. Update and Win
+		puzzle:updateGui()
+		puzzle:checkForWin()
+	end
+	_container.DrawSolutionInstantly = DrawSolutionInstantly
+end
+
+-- // GUI CREATION // --
+local function SpawnSolveButton(puzzle)
+	-- Cleanup old gui if exists
+	local ply = Players.LocalPlayer
+	local pGui = ply:WaitForChild("PlayerGui")
+	if pGui:FindFirstChild("FlowSolverGUI") then
+		pGui.FlowSolverGUI:Destroy()
+	end
+
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "FlowSolverGUI"
+	screenGui.ResetOnSpawn = false
+	screenGui.Parent = cloneref(game:GetService("CoreGui"))
+
+	local btn = Instance.new("TextButton")
+	btn.Name = "SolveBtn"
+	btn.Size = UDim2.new(0, 200, 0, 50)
+	btn.Position = UDim2.new(0.5, -100, 0.1, 0) -- Top Center
+	btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	btn.BorderSizePixel = 0
+	btn.Text = "INSTANT SOLVE"
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 20
+	btn.AutoButtonColor = true
+	btn.Parent = screenGui
+
+	local uiCorner = Instance.new("UICorner")
+	uiCorner.CornerRadius = UDim.new(0, 8)
+	uiCorner.Parent = btn
+
+	local uiStroke = Instance.new("UIStroke")
+	uiStroke.Color = Color3.fromRGB(0, 255, 128)
+	uiStroke.Thickness = 2
+	uiStroke.Parent = btn
+
+	local debounce = false
+
+	btn.MouseButton1Click:Connect(function()
+		if debounce then return end
+		debounce = true
+		
+		btn.Text = "SOLVING..."
+		btn.BackgroundColor3 = Color3.fromRGB(0, 170, 85)
+		
+		-- Execute Solve
+		HintSystem:DrawSolutionInstantly(puzzle)
+		
+		-- Cooldown
+		task.wait(1)
+		
+		-- Remove Button
+		screenGui:Destroy()
+	end)
+end
+
+-- // HOOKING LOGIC // --
+local _result = ReplicatedStorage:WaitForChild("Modules"):FindFirstChild("Misc")
+if _result ~= nil then
+	_result = _result:FindFirstChild("FlowGameManager")
+	if _result ~= nil then
+		_result = _result:FindFirstChild("FlowGame")
+	end
+end
+
+local bb = _result
+if bb then
+	local FlowGameModule = require(bb)
+	local old = FlowGameModule.new
+	
+	FlowGameModule.new = function(...)
+		local args = { ... }
+		local output = { old(unpack(args)) }
+		local puzzle = output[1]
+		
+		-- Spawn the GUI button instead of auto-solving
+		task.spawn(function()
+			SpawnSolveButton(puzzle)
+		end)
+		
+		return puzzle
+	end
+end
+
+return nil

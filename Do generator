@@ -2,36 +2,61 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
--- // HELPER FUNCTIONS // --
+
 local function getDirection(currentRow, currentCol, otherRow, otherCol)
-	if otherRow < currentRow then return "up" end
-	if otherRow > currentRow then return "down" end
-	if otherCol < currentCol then return "left" end
-	if otherCol > currentCol then return "right" end
+	if otherRow < currentRow then
+		return "up"
+	end
+	if otherRow > currentRow then
+		return "down"
+	end
+	if otherCol < currentCol then
+		return "left"
+	end
+	if otherCol > currentCol then
+		return "right"
+	end
 end
 
 local function getConnections(prev, curr, nextnode)
 	local connections = {}
 	if prev and curr then
 		local dir = getDirection(curr.row, curr.col, prev.row, prev.col)
-		if dir == "up" then dir = "down"
-		elseif dir == "down" then dir = "up"
-		elseif dir == "left" then dir = "right"
-		elseif dir == "right" then dir = "left" end
-		if dir ~= "" and dir then connections[dir] = true end
+		if dir == "up" then
+			dir = "down"
+		elseif dir == "down" then
+			dir = "up"
+		elseif dir == "left" then
+			dir = "right"
+		elseif dir == "right" then
+			dir = "left"
+		end
+		if dir ~= "" and dir then
+			connections[dir] = true
+		end
 	end
 	if nextnode and curr then
 		local dir = getDirection(curr.row, curr.col, nextnode.row, nextnode.col)
-		if dir ~= "" and dir then connections[dir] = true end
+		if dir ~= "" and dir then
+			connections[dir] = true
+		end
 	end
 	return connections
 end
 
 local function isNeighbourLocal(r1, c1, r2, c2)
-	if r2 == r1 - 1 and c2 == c1 then return "up" end
-	if r2 == r1 + 1 and c2 == c1 then return "down" end
-	if r2 == r1 and c2 == c1 - 1 then return "left" end
-	if r2 == r1 and c2 == c1 + 1 then return "right" end
+	if r2 == r1 - 1 and c2 == c1 then
+		return "up"
+	end
+	if r2 == r1 + 1 and c2 == c1 then
+		return "down"
+	end
+	if r2 == r1 and c2 == c1 - 1 then
+		return "left"
+	end
+	if r2 == r1 and c2 == c1 + 1 then
+		return "right"
+	end
 	return false
 end
 
@@ -40,57 +65,101 @@ local function coordKey(node)
 end
 
 local function orderPathFromEndpoints(path, endpoints)
-	if not path or #path == 0 then return path end
+	if not path or #path == 0 then
+		return path
+	end
 	local startEndpoint
 	for _, ep in endpoints or {} do
 		for _1, n in path do
 			if n.row == ep.row and n.col == ep.col then
-				startEndpoint = { row = ep.row, col = ep.col }
+				startEndpoint = {
+					row = ep.row,
+					col = ep.col,
+				}
 				break
 			end
 		end
-		if startEndpoint then break end
+		if startEndpoint then
+			break
+		end
 	end
 	if not startEndpoint then
 		local inPath = {}
-		for _, n in path do inPath[coordKey(n)] = n end
+		for _, n in path do
+			local _arg0 = coordKey(n)
+			inPath[_arg0] = n
+		end
 		for _, n in path do
 			local neighbours = 0
 			local dirs = { { n.row - 1, n.col }, { n.row + 1, n.col }, { n.row, n.col - 1 }, { n.row, n.col + 1 } }
 			for _1, _binding in dirs do
-				if inPath[`{_binding[1]}-{_binding[2]}`] ~= nil then neighbours += 1 end
+				local r = _binding[1]
+				local c = _binding[2]
+				local _arg0 = `{r}-{c}`
+				if inPath[_arg0] ~= nil then
+					neighbours += 1
+				end
 			end
 			if neighbours == 1 then
-				startEndpoint = { row = n.row, col = n.col }
+				startEndpoint = {
+					row = n.row,
+					col = n.col,
+				}
 				break
 			end
 		end
 	end
 	if not startEndpoint then
-		startEndpoint = { row = path[1].row, col = path[1].col }
+		startEndpoint = {
+			row = path[1].row,
+			col = path[1].col,
+		}
 	end
 	local remaining = {}
-	for _, n in path do remaining[coordKey(n)] = { row = n.row, col = n.col } end
+	for _, n in path do
+		local _arg0 = coordKey(n)
+		local _arg1 = {
+			row = n.row,
+			col = n.col,
+		}
+		remaining[_arg0] = _arg1
+	end
 	local ordered = {}
-	local current = { row = startEndpoint.row, col = startEndpoint.col }
-	table.insert(ordered, table.clone(current))
-	remaining[coordKey(current)] = nil
+	local current = {
+		row = startEndpoint.row,
+		col = startEndpoint.col,
+	}
+	local _object = table.clone(current)
+	setmetatable(_object, nil)
+	table.insert(ordered, _object)
+	local _arg0 = coordKey(current)
+	remaining[_arg0] = nil
 	while true do
+		-- ▼ ReadonlyMap.size ▼
 		local _size = 0
-		for _ in remaining do _size += 1 end
-		if not (_size > 0) then break end
+		for _ in remaining do
+			_size += 1
+		end
+		-- ▲ ReadonlyMap.size ▲
+		if not (_size > 0) then
+			break
+		end
 		local foundNext = false
 		for key, node in remaining do
 			local _value = isNeighbourLocal(current.row, current.col, node.row, node.col)
 			if _value ~= "" and _value then
-				table.insert(ordered, table.clone(node))
+				local _object_1 = table.clone(node)
+				setmetatable(_object_1, nil)
+				table.insert(ordered, _object_1)
 				remaining[key] = nil
 				current = node
 				foundNext = true
 				break
 			end
 		end
-		if not foundNext then return path end
+		if not foundNext then
+			return path
+		end
 	end
 	return ordered
 end
@@ -98,107 +167,166 @@ end
 local HintSystem = {}
 do
 	local _container = HintSystem
-	
-	-- Optimized Instant Solver
-	local function DrawSolutionInstantly(self, puzzle)
-		if not puzzle or not puzzle.Solution then return nil end
-		
-		-- 1. Setup paths
-		for colorIndex = 0, #puzzle.Solution - 1 do
-			puzzle.paths[colorIndex + 1] = {}
+	local function DrawSolutionOneByOne(self, puzzle, delayTime)
+		if delayTime == nil then
+			delayTime = 0.05
 		end
-		
-		-- 2. Calculate data
-		for colorIndex = 0, #puzzle.Solution - 1 do
-			local path = puzzle.Solution[colorIndex + 1]
-			local endpoints = puzzle.targetPairs[colorIndex + 1]
+		if not puzzle or not puzzle.Solution then
+			return nil
+		end
+		local totalPaths = #puzzle.Solution
+		local indices = {}
+		do
+			local i = 1
+			local _shouldIncrement = false
+			while true do
+				if _shouldIncrement then
+					i += 1
+				else
+					_shouldIncrement = true
+				end
+				if not (i <= totalPaths) then
+					break
+				end
+				local _i = i
+				table.insert(indices, _i)
+			end
+		end
+		for i = #indices - 1, 2, -1 do
+			local j = math.random(1, i)
+			local temp = indices[i + 1]
+			indices[i + 1] = indices[j + 1]
+			indices[j + 1] = temp
+		end
+		for _, colorIndex in indices do
+			local path = puzzle.Solution[colorIndex]
+			local endpoints = puzzle.targetPairs[colorIndex]
 			local orderedPath = orderPathFromEndpoints(path, endpoints)
-			puzzle.paths[colorIndex + 1] = {}
-			
-			-- Fill nodes and calculate pipe connections for visuals
-			for i = 1, #orderedPath do
-				local node = orderedPath[i]
-				table.insert(puzzle.paths[colorIndex + 1], { row = node.row, col = node.col })
-				
-				-- Handle visuals (connections)
-				local prev = orderedPath[i - 1]
-				local nextNode = orderedPath[i + 1]
-				
-				-- Note: orderedPath is 1-based in this scope
-				-- Logic adjusted to ensure pipes connect visually
-				if i > 1 then prev = orderedPath[i-1] else prev = nil end
-				if i < #orderedPath then nextNode = orderedPath[i+1] else nextNode = nil end
-
+			puzzle.paths[colorIndex] = {}
+			for i = 0, #orderedPath - 1 do
+				local node = orderedPath[i + 1]
+				local _exp = puzzle.paths[colorIndex]
+				local _arg0 = {
+					row = node.row,
+					col = node.col,
+				}
+				table.insert(_exp, _arg0)
+				local prev = orderedPath[i]
+				local nextNode = orderedPath[i + 2]
 				local conn = getConnections(prev, node, nextNode)
 				puzzle.gridConnections = puzzle.gridConnections or {}
+				puzzle.gridConnections[`{node.row}-{node.col}`] = conn
+				puzzle:updateGui()
+				task.wait(delayTime)
+			end
+			puzzle:checkForWin()
+		end
+		puzzle:checkForWin()
+	end
+	_container.DrawSolutionOneByOne = DrawSolutionOneByOne
+	
+	local function DrawSolutionInstantly(self, puzzle)
+		if not puzzle or not puzzle.Solution then
+			return nil
+		end
+		
+		-- Clear existing paths
+		puzzle.paths = {}
+		puzzle.gridConnections = {}
+		
+		-- Draw all paths instantly
+		for colorIndex = 1, #puzzle.Solution do
+			local path = puzzle.Solution[colorIndex]
+			local endpoints = puzzle.targetPairs[colorIndex]
+			local orderedPath = orderPathFromEndpoints(path, endpoints)
+			
+			-- Store the complete path
+			puzzle.paths[colorIndex] = {}
+			for i, node in ipairs(orderedPath) do
+				local _exp = puzzle.paths[colorIndex]
+				local _arg0 = {
+					row = node.row,
+					col = node.col,
+				}
+				table.insert(_exp, _arg0)
+				
+				-- Calculate connections
+				local prev = orderedPath[i - 1]
+				local nextNode = orderedPath[i + 1]
+				local conn = getConnections(prev, node, nextNode)
+				
 				puzzle.gridConnections[`{node.row}-{node.col}`] = conn
 			end
 		end
 		
-		-- 3. Update and Win
+		-- Update the GUI once with all paths
 		puzzle:updateGui()
 		puzzle:checkForWin()
 	end
 	_container.DrawSolutionInstantly = DrawSolutionInstantly
 end
 
--- // GUI CREATION // --
-local function SpawnSolveButton(puzzle)
-	-- Cleanup old gui if exists
-	local ply = Players.LocalPlayer
-	local pGui = ply:WaitForChild("PlayerGui")
-	if pGui:FindFirstChild("FlowSolverGUI") then
-		pGui.FlowSolverGUI:Destroy()
-	end
+local creatingButton = false
+local lastButtonCreationTime = 0
 
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "FlowSolverGUI"
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = cloneref(game:GetService("CoreGui"))
+local function createSolveButton()
+    if PlayerGui:FindFirstChild("SolveButton") then
+        return
+    end
 
-	local btn = Instance.new("TextButton")
-	btn.Name = "SolveBtn"
-	btn.Size = UDim2.new(0, 200, 0, 50)
-	btn.Position = UDim2.new(0.5, -100, 0.1, 0) -- Top Center
-	btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	btn.BorderSizePixel = 0
-	btn.Text = "INSTANT SOLVE"
-	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	btn.Font = Enum.Font.GothamBold
-	btn.TextSize = 20
-	btn.AutoButtonColor = true
-	btn.Parent = screenGui
+    if creatingButton then
+        repeat task.wait() until not creatingButton
+        if PlayerGui:FindFirstChild("SolveButton") then
+            return
+        end
+    end
 
-	local uiCorner = Instance.new("UICorner")
-	uiCorner.CornerRadius = UDim.new(0, 8)
-	uiCorner.Parent = btn
+    
 
-	local uiStroke = Instance.new("UIStroke")
-	uiStroke.Color = Color3.fromRGB(0, 255, 128)
-	uiStroke.Thickness = 2
-	uiStroke.Parent = btn
+    
 
-	local debounce = false
+    lastButtonCreationTime = tick()
 
-	btn.MouseButton1Click:Connect(function()
-		if debounce then return end
-		debounce = true
-		
-		btn.Text = "SOLVING..."
-		btn.BackgroundColor3 = Color3.fromRGB(0, 170, 85)
-		
-		-- Execute Solve
-		HintSystem:DrawSolutionInstantly(puzzle)
-		
-		-- Cooldown
-		task.wait(1)
-		
-		-- Remove Button
-		screenGui:Destroy()
-	end)
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "SolveButtonGui"
+    screenGui.ResetOnSpawn = false
+
+    local button = Instance.new("TextButton")
+    button.Name = "SolveButton"
+    button.Text = "SOLVE PUZZLE"
+    button.Size = UDim2.new(0, 150, 0, 50)
+    button.Position = UDim2.new(0.8, 0, 0.1, 0)
+    button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 18
+    button.BorderSizePixel = 2
+    button.BorderColor3 = Color3.fromRGB(255, 255, 255)
+
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 2)
+    uiCorner.Parent = button
+
+    button.MouseEnter:Connect(function()
+        button.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        button.Size = UDim2.new(0, 155, 0, 52)
+    end)
+
+    button.MouseLeave:Connect(function()
+        button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        button.Size = UDim2.new(0, 150, 0, 50)
+    end)
+
+    button.Parent = screenGui
+    screenGui.Parent = cloneref(game:GetService("CoreGui"))
+
+    
+    return button
 end
 
--- // HOOKING LOGIC // --
+
+
+-- Main code
 local _result = ReplicatedStorage:WaitForChild("Modules"):FindFirstChild("Misc")
 if _result ~= nil then
 	_result = _result:FindFirstChild("FlowGameManager")
@@ -217,13 +345,31 @@ if bb then
 		local output = { old(unpack(args)) }
 		local puzzle = output[1]
 		
-		-- Spawn the GUI button instead of auto-solving
-		task.spawn(function()
-			SpawnSolveButton(puzzle)
-		end)
+		-- Create solve button
+		local solveButton = createSolveButton()
+		
+		
+		if solveButton then
+			solveButton.MouseButton1Click:Connect(function()
+			creatingButton = true
+				HintSystem:DrawSolutionInstantly(puzzle)
+				solveButton.Text = "SOLVED!"
+				solveButton:Destroy()
+				solveButton.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+				local elapsed = tick() - lastButtonCreationTime
+    
+        task.wait(1)
+   
+    creatingButton = false
+				
+			
+			end)
+		end
 		
 		return puzzle
 	end
 end
 
 return nil
+
+
